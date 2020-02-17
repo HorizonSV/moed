@@ -879,33 +879,15 @@ def practice11_02():
     # Увеличить в 2.7 раза а) ближайший сосед, б) билинейная интерполяция
     # Уменьшить  в 1.3 раза а), б)
 
-    # img = read_jpg('./../project/grace.jpg')
-    # # img.show()
-    # print(img)
-    # NM = img.size
-    # data = img.load()
-    #
-    # print(data)
-    # # newimg = Image.new(mode='L', size=NM)
-    # # newimg = Image.fromarray(obj=data)
-    # # newimg.show()
+    image = read_jpg('files/grace.jpg')  # Открываем изображение
 
-    image = read_jpg('./../project/grace.jpg')  # Открываем изображение
-    draw = ImageDraw.Draw(image)  # Создаем инструмент для рисования
-    N = image.size[0]  # Определяем ширину
-    M = image.size[1]  # Определяем высоту
-    pix = image.load()  # Выгружаем значения пикселей
+    factor = 2.7
+    image_resized_1 = pillow_image_resize(image, factor, type='nearest', mode='increase')  # ближайший сосед - увеличение
+    image_resized_1.show()
 
-    N2 = round(N * 2.7)
-    M2 = round(M * 2.7)
-    for x in range(N2):
-        for y in range(M2):
-            r, g, b = pix[x, y]
-            print(r, g, b)
-            sr = (r + g + b) // 3  # среднее значение
-            draw.point((x, y), (sr, sr, sr))  # рисуем пиксель
-
-    image.show()  # не забываем сохранить изображение
+    factor = 1.3
+    image_resized_2 = pillow_image_resize(image, factor, type='nearest', mode='decrease')  # ближайший сосед - уменьшение
+    image_resized_2.show()
 
 
 if __name__ == "__main__":

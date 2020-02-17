@@ -3,7 +3,7 @@ import random
 import struct
 from scipy.io import wavfile
 import matplotlib.image as mpimg
-from PIL import Image
+from PIL import Image, ImageDraw
 
 
 def linear_trend(x, k=1, b=0):
@@ -734,3 +734,45 @@ def read_jpg(file):
 
 def read_xcr():
     pass
+
+
+def pillow_image_resize(image, factor, type, mode):
+    image_resized = None
+    pix = image.load()  # Выгружаем значения пикселей
+    w, h = image.size[0], image.size[1]
+
+    if mode == 'increase':
+        new_w, new_h = int(w * factor), int(h * factor)
+    elif mode == 'decrease':
+        new_w, new_h = int(w / factor), int(h / factor)
+    else:
+        raise ValueError('Wrong mode')
+
+    image_resized = Image.new('RGB', (new_w, new_h))
+    draw = ImageDraw.Draw(image_resized)  # Создаем инструмент для рисования
+
+    print('new w =', new_w, '\nnew h =', new_h)
+
+    if type == 'nearest':
+        for col in range(new_w):
+            for row in range(new_h):
+                if mode == 'increase':
+                    p = pix[int(col / factor), int(row / factor)]
+                elif mode == 'decrease':
+                    p = pix[int(col * factor), int(row * factor)]
+                else:
+                    raise ValueError('Wrong mode')
+                draw.point((col, row), p)
+
+    elif type == 'bilinear':
+        for col in range(new_w):
+            for row in range(new_h):
+                # R1 = f(x1, y1) + (x - x1) / (x2 - x1) * (f(x2, y1) - f(x1, y1))
+                # R2 = f(x1, y2) + (x - x1) / (x2 - x1) * (f(x2, y2) - f(x1, y2))
+                # P = R2 + (y - y2) / (y2 - y1) * (R1 - R2)
+                pass
+
+    else:
+        raise ValueError('Wrong type')
+
+    return image_resized
