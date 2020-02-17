@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-from project.tools import *
-=======
 from tools import *
->>>>>>> from pycharm project
 import matplotlib.pyplot as plt
 import scipy.signal as sg
 import wave
@@ -917,10 +913,7 @@ if __name__ == "__main__":
     # voice()
     # voice2()
     # zach()
-<<<<<<< HEAD
     # practice04_02()
-=======
     # practice04_02
->>>>>>> from pycharm project
     practice11_02()
     pass
