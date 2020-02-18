@@ -879,15 +879,46 @@ def practice11_02():
     # Увеличить в 2.7 раза а) ближайший сосед, б) билинейная интерполяция
     # Уменьшить  в 1.3 раза а), б)
 
-    image = read_jpg('files/grace.jpg')  # Открываем изображение
+    image = read_jpg_grayscale('files/grace.jpg')  # Открываем изображение
 
     factor = 2.7
-    image_resized_1 = pillow_image_resize(image, factor, type='nearest', mode='increase')  # ближайший сосед - увеличение
+    image_resized_1 = pillow_image_grayscale_resize(image, factor, type='nearest', mode='increase')  # ближайший сосед - увеличение
     image_resized_1.show()
 
     factor = 1.3
-    image_resized_2 = pillow_image_resize(image, factor, type='nearest', mode='decrease')  # ближайший сосед - уменьшение
+    image_resized_2 = pillow_image_grayscale_resize(image, factor, type='nearest', mode='decrease')  # ближайший сосед - уменьшение
     image_resized_2.show()
+
+
+def practice18_02():
+    # Применить 3 вида преобразования 1) Негатив, 2) Степенной, 3) Логарифмический
+    image_1 = read_jpg_grayscale('files/image1.jpg')
+    image_2 = read_jpg_grayscale('files/image2.jpg')
+
+    C = 10
+    Gamma = 1.5
+
+    image_1.show()
+    image_2.show()
+
+    # image_1_negative = pillow_image_grayscale_negative(image_1)
+    # image_1_negative.show()
+    #
+    # image_2_negative = pillow_image_grayscale_negative(image_2)
+    # image_2_negative.show()
+
+    # image_1_gammacorr = pillow_image_grayscale_gammacorr(image_1, C, Gamma)
+    # image_1_gammacorr.show()
+    #
+    # image_2_gammacorr = pillow_image_grayscale_gammacorr(image_2, C, Gamma)
+    # image_2_gammacorr.show()
+
+    image_1_log = pillow_image_grayscale_log(image_1, C)
+    image_1_log.show()
+
+    image_2_log = pillow_image_grayscale_log(image_2, C)
+    image_2_log.show()
+
 
 
 if __name__ == "__main__":
@@ -897,5 +928,5 @@ if __name__ == "__main__":
     # zach()
     # practice04_02()
     # practice04_02
-    practice11_02()
-    pass
+    # practice11_02()
+    practice18_02()

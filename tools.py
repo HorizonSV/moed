@@ -40,6 +40,17 @@ def normalize(numbers: np.array, S: int) -> np.array:
     """
     return (((numbers - min(numbers)) / (max(numbers) - min(numbers))) - 0.5) * 2 * S
 
+def normalize_v2(numbers, S):
+    """
+    Функция нормирования
+    """
+    norm = []
+    min_number = min(numbers)
+    max_number = max(numbers)
+    for number in numbers:
+        norm.append((((number - min_number) / (max_number - min_number)) - 0.5) * 2 * S)
+    return norm
+
 
 def random_built_in(N, lo, hi):
     """
@@ -727,8 +738,8 @@ def read_png(file):
     return img
 
 
-def read_jpg(file):
-    image = Image.open(file)
+def read_jpg_grayscale(file):
+    image = Image.open(file).convert('L')
     return image
 
 
@@ -736,8 +747,7 @@ def read_xcr():
     pass
 
 
-def pillow_image_resize(image, factor, type, mode):
-    image_resized = None
+def pillow_image_grayscale_resize(image, factor, type, mode):
     pix = image.load()  # Выгружаем значения пикселей
     w, h = image.size[0], image.size[1]
 
@@ -748,7 +758,7 @@ def pillow_image_resize(image, factor, type, mode):
     else:
         raise ValueError('Wrong mode')
 
-    image_resized = Image.new('RGB', (new_w, new_h))
+    image_resized = Image.new('L', (new_w, new_h))
     draw = ImageDraw.Draw(image_resized)  # Создаем инструмент для рисования
 
     print('new w =', new_w, '\nnew h =', new_h)
@@ -776,3 +786,63 @@ def pillow_image_resize(image, factor, type, mode):
         raise ValueError('Wrong type')
 
     return image_resized
+
+
+def pillow_image_grayscale_negative(image):
+    pix = image.load()
+    w, h = image.size[0], image.size[1]
+
+    image_negative = Image.new('L', (w, h))
+    draw = ImageDraw.Draw(image_negative)
+
+    for col in range(w):
+        for row in range(h):
+            draw.point((col, row), 255 - pix[col, row])
+
+    return image_negative
+
+
+def pillow_image_grayscale_gammacorr(image, C, Y):
+    pix = image.load()
+    w, h = image.size[0], image.size[1]
+    gammacorr = []
+
+    image_gammacorr = Image.new('L', (w, h))
+    draw = ImageDraw.Draw(image_gammacorr)
+
+    for col in range(w):
+        for row in range(h):
+            gammacorr.append(int(C * pix[col, row] ** Y))
+
+    gammacorr_norm = normalize_v2(gammacorr, 255)
+
+    i = 0
+    for col in range(w):
+        for row in range(h):
+            draw.point((col, row), int(gammacorr_norm[i]))
+            i += 1
+
+    return image_gammacorr
+
+
+def pillow_image_grayscale_log(image, C):
+    pix = image.load()
+    w, h = image.size[0], image.size[1]
+    log = []
+
+    image_log = Image.new('L', (w, h))
+    draw = ImageDraw.Draw(image_log)
+
+    for col in range(w):
+        for row in range(h):
+            log.append(int(C * np.log(pix[col, row] + 1)))
+
+    log_norm = normalize_v2(log, 255)
+
+    i = 0
+    for col in range(w):
+        for row in range(h):
+            draw.point((col, row), int(log_norm[i]))
+            i += 1
+
+    return image_log
