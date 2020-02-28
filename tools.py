@@ -4,6 +4,8 @@ import struct
 from scipy.io import wavfile
 import matplotlib.image as mpimg
 from PIL import Image, ImageDraw
+import pandas as pd
+import scipy.integrate as integrate
 
 
 def linear_trend(x, k=1, b=0):
@@ -758,12 +760,9 @@ def pillow_image_grayscale_resize(image, factor, type, mode):
     else:
         raise ValueError('Wrong mode')
 
-    image_resized = Image.new('L', (new_w, new_h))
-    draw = ImageDraw.Draw(image_resized)  # Создаем инструмент для рисования
-
-    print('new w =', new_w, '\nnew h =', new_h)
-
     if type == 'nearest':
+        image_nearest_resized = Image.new('L', (new_w, new_h))
+        draw = ImageDraw.Draw(image_nearest_resized)  # Создаем инструмент для рисования
         for col in range(new_w):
             for row in range(new_h):
                 if mode == 'increase':
@@ -773,14 +772,46 @@ def pillow_image_grayscale_resize(image, factor, type, mode):
                 else:
                     raise ValueError('Wrong mode')
                 draw.point((col, row), p)
+        image_resized = image_nearest_resized
 
     elif type == 'bilinear':
-        for col in range(new_w):
-            for row in range(new_h):
-                # R1 = f(x1, y1) + (x - x1) / (x2 - x1) * (f(x2, y1) - f(x1, y1))
-                # R2 = f(x1, y2) + (x - x1) / (x2 - x1) * (f(x2, y2) - f(x1, y2))
-                # P = R2 + (y - y2) / (y2 - y1) * (R1 - R2)
-                pass
+        image_bilinear_rows = Image.new('L', (new_w, new_h))
+        draw = ImageDraw.Draw(image_bilinear_rows)  # Создаем инструмент для рисования
+        for col in range(1, (new_w - 1)):
+            for row in range(1, (new_h - 1)):
+                if mode == 'increase':
+                    r1 = pix[int(col / factor), int((row - 1) / factor)]
+                    r2 = pix[int(col / factor), int((row + 1) / factor)]
+                elif mode == 'decrease':
+                    r1 = pix[int(col * factor), int((row - 1) * factor)]
+                    r2 = pix[int(col * factor), int((row + 1) * factor)]
+                else:
+                    raise ValueError('Wrong mode')
+                p = int((r1 + r2) / 2)
+                draw.point((col, row), p)
+            if mode == 'increase':
+                draw.point((col, 0), pix[int(col / factor), int(0 / factor)])
+                draw.point((col, new_h), pix[int(col / factor), int((new_h - 1) / factor)])
+            elif mode == 'decrease':
+                draw.point((col, 0), pix[int(col * factor), int(0 * factor)])
+                draw.point((col, new_h), pix[int(col * factor), int((new_h - 1) * factor)])
+            else:
+                raise ValueError('Wrong mode')
+
+        pix_bilinear_rows = image_bilinear_rows.load()
+        image_bilinear_resized = Image.new('L', (new_w, new_h))
+        draw2 = ImageDraw.Draw(image_bilinear_resized)  # Создаем инструмент для рисования
+
+        for row in range(1, (new_h - 1)):
+            for col in range(1, (new_w - 1)):
+                r1 = pix_bilinear_rows[int((col - 1)), int(row)]
+                r2 = pix_bilinear_rows[int((col + 1)), int(row)]
+                p = int((r1 + r2) / 2)
+                draw2.point((col, row), p)
+            draw2.point((0, row), pix_bilinear_rows[int(0), int(row)])
+            draw2.point((new_w, row), pix_bilinear_rows[int((new_w - 1)), int(row)])
+
+        image_resized = image_bilinear_resized
 
     else:
         raise ValueError('Wrong type')
@@ -835,7 +866,7 @@ def pillow_image_grayscale_log(image, C):
 
     for col in range(w):
         for row in range(h):
-            log.append(int(C * np.log(pix[col, row] + 1)))
+            log.append(C * np.log(pix[col, row] + 1))
 
     log_norm = normalize_v2(log, 255)
 
@@ -846,3 +877,15 @@ def pillow_image_grayscale_log(image, C):
             i += 1
 
     return image_log
+
+
+def pillow_image_grayscale_grad_preobr(r):
+    func = P()
+    CDF = integrate.quad(func, 0, r)
+    return 0
+
+
+def pillow_image_grayscale_hist(image):
+    pix = list(image.getdata())
+    data = pd.Series(pix)
+    return data

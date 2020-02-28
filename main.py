@@ -4,7 +4,15 @@ import scipy.signal as sg
 import wave
 import struct
 import numpy as np
+import pandas as pd
 from PIL import Image, ImageDraw
+plt.style.use('ggplot')
+plt.rcParams['lines.color'] = 'red'
+plt.rcParams['axes.facecolor'] = '#45484B'
+plt.rcParams['axes.edgecolor'] = '#3C3F41'
+plt.rcParams['figure.facecolor'] = '#3C3F41'
+plt.rcParams['figure.edgecolor'] = '#3C3F41'
+plt.rcParams['grid.color'] = '#3C3F41'
 
 
 def car():
@@ -881,13 +889,21 @@ def practice11_02():
 
     image = read_jpg_grayscale('files/grace.jpg')  # Открываем изображение
 
+    # factor = 2.7
+    # image_resized_1 = pillow_image_grayscale_resize(image, factor, type='nearest', mode='increase')
+    # image_resized_1.show()
+    #
+    # factor = 1.3
+    # image_resized_2 = pillow_image_grayscale_resize(image, factor, type='nearest', mode='decrease')
+    # image_resized_2.show()
+
     factor = 2.7
-    image_resized_1 = pillow_image_grayscale_resize(image, factor, type='nearest', mode='increase')  # ближайший сосед - увеличение
+    image_resized_1 = pillow_image_grayscale_resize(image, factor, type='bilinear', mode='increase')
     image_resized_1.show()
 
     factor = 1.3
-    image_resized_2 = pillow_image_grayscale_resize(image, factor, type='nearest', mode='decrease')  # ближайший сосед - уменьшение
-    image_resized_2.show()
+    image_resized_1 = pillow_image_grayscale_resize(image, factor, type='bilinear', mode='decrease')
+    image_resized_1.show()
 
 
 def practice18_02():
@@ -895,7 +911,7 @@ def practice18_02():
     image_1 = read_jpg_grayscale('files/image1.jpg')
     image_2 = read_jpg_grayscale('files/image2.jpg')
 
-    C = 10
+    C = 20
     Gamma = 1.5
 
     image_1.show()
@@ -920,6 +936,30 @@ def practice18_02():
     image_2_log.show()
 
 
+def practice25_02():
+    # Градационное преобразование
+    # + 1 Негатив
+    # + 2 Гамма-коррекция
+    # + 3 Log
+    # 4 Эквализация гистограммы = CDF
+    # 5 Приведение гистограммы (Обратная 4)
+    # Алгоритм:
+    # а) jpg
+    # б) Гистограмма
+    # в) Интеграл
+    # г) Корректирование
+    image = read_jpg_grayscale('files/HollywoodLC.jpg')
+    data = pillow_image_grayscale_hist(image)
+    data.plot.hist(bins=50)
+    plt.show()
+    data.plot.kde()
+    plt.show()
+    plt.savefig('some.jpg')
+
+
+
+
+
 
 if __name__ == "__main__":
     # car()
@@ -929,4 +969,5 @@ if __name__ == "__main__":
     # practice04_02()
     # practice04_02
     # practice11_02()
-    practice18_02()
+    # practice18_02()
+    practice25_02()
