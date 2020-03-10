@@ -745,8 +745,14 @@ def read_jpg_grayscale(file):
     return image
 
 
-def read_xcr():
-    pass
+def read_xcr(file):
+    with open(file, "rb") as binary_file:
+        figures = []
+        data = binary_file.read()
+        for i in range(0, len(data), 2):
+            pos = struct.unpack('h', data[i:i + 2])
+            figures.append(pos[0])
+        return figures
 
 
 def pillow_image_grayscale_resize(image, factor, type, mode):
@@ -879,10 +885,12 @@ def pillow_image_grayscale_log(image, C):
     return image_log
 
 
-def pillow_image_grayscale_grad_preobr(r):
-    func = P()
+def pillow_image_grayscale_grad_preobr(image, r):
+    def func(x):
+        data = list(image.getdata())
+        return data[x]
     CDF = integrate.quad(func, 0, r)
-    return 0
+    return CDF
 
 
 def pillow_image_grayscale_hist(image):

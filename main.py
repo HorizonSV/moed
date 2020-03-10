@@ -954,11 +954,32 @@ def practice25_02():
     plt.show()
     data.plot.kde()
     plt.show()
-    plt.savefig('some.jpg')
+    r = 2
+    data_integ = pillow_image_grayscale_grad_preobr(image, r)
+    data_integ.kde()
+    plt.show()
 
-
-
-
+def practice03_03():
+    # автоКорреляцию
+    # Спектр автокорреляции
+    # Взять производную для удаления тренда
+    # Взять от нее автокорреляцию и спектр от нее
+    # Настроить режекторный филльтр (0.3, 0.5) и шаг дискретизации 1
+    # m = 16, dx = 1, bsf(m, dx, fc1, fc2, w(вес)), достаточно профильтровать каждую строчку
+    # 1 Прочитать файл
+    # 2 построчно инкрементом dy = 10 считать производную
+    # a) x'k
+    # b) Rx'x'
+    # c) |F[Rx'x']|
+    # d) Определить параметры пика fg
+    # e) bsf()
+    # f) фильтр строк
+    # g) Контраст
+    image = read_xcr('files/h400x300.xcr')
+    a = np.array(image)
+    b = a.reshape(300, 400)
+    plt.imshow(b)
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -970,4 +991,5 @@ if __name__ == "__main__":
     # practice04_02
     # practice11_02()
     # practice18_02()
-    practice25_02()
+    # practice25_02()
+    practice03_03()
