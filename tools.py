@@ -6,6 +6,7 @@ import matplotlib.image as mpimg
 from PIL import Image, ImageDraw
 import pandas as pd
 import scipy.integrate as integrate
+import seaborn as sns
 
 
 def linear_trend(x, k=1, b=0):
@@ -283,11 +284,40 @@ def general_statistics(function, N):
     print('Куртозис = ', round(Sigma_2, 4))
 
 
-def hist(func, bins, kde, color):
-    """
-    Плотность распределения ПЕРЕДЕЛАТЬ
-    """
-    # sns.distplot(func, bins=bins, kde=kde, color=color)
+# def hist(func, bins, kde):
+#     """
+#     Плотность распределения
+#     """
+#     # sns.distplot(func, bins=bins, kde=kde, shade=True)
+#     snsplot = sns.kdeplot(data['sepal width (cm)'], shade=True)
+#     fig = snsplot.get_figure()
+
+
+def hist_v2(image):
+    S = 256
+    pix = np.array(image)
+
+    hist = np.zeros(shape=S)
+
+    for i in range(0, pix.shape[0]):
+        for j in range(0, pix.shape[1]):
+            hist[pix[i][j]] += 1
+
+    for k in range(0, S):
+        hist[k] /= (pix.shape[0] * pix.shape[1])
+
+    return hist
+
+
+def cdf_calc(hist):
+    S = 256
+    cdf = np.zeros(shape=S)
+    cdf[0] = hist[0]
+
+    for k in range(1, S):
+        cdf[k] = (cdf[k - 1] + hist[k])
+
+    return cdf
 
 
 def acf(y, N):
@@ -692,18 +722,18 @@ def bpf(m, dt, fc1, fc2):
     return bpw
 
 
-# def bsf(self, m, dt, fc1, fc2):
-#     lpw1 = Test19.lpf_re(self, m, dt, fc1)
-#     lpw2 = Test19.lpf_re(self, m, dt, fc2)
-#     bsw = []
-#
-#     for i in range(2*m+1):
-#         if i == m:
-#             bsw.append(1 + lpw1[i] - lpw2[i])
-#         else:
-#             bsw.append(lpw1[i] - lpw2[i])
-#
-#     return bsw
+def bsf(m, dt, fc1, fc2):
+    lpw1 = lpf(m, dt, fc1)
+    lpw2 = lpf(m, dt, fc2)
+    bsw = []
+
+    for i in range(2*m+1):
+        if i == m:
+            bsw.append(1 + lpw1[i] - lpw2[i])
+        else:
+            bsw.append(lpw1[i] - lpw2[i])
+
+    return bsw
 
 
 def ecg_func(data, dt, alpha=30, f0=10):
@@ -885,15 +915,48 @@ def pillow_image_grayscale_log(image, C):
     return image_log
 
 
-def pillow_image_grayscale_grad_preobr(image, r):
-    def func(x):
-        data = list(image.getdata())
-        return data[x]
-    CDF = integrate.quad(func, 0, r)
-    return CDF
+def pillow_image_grayscale_equ(image, C, cdf):
+    pix = image.load()
+    w, h = image.size[0], image.size[1]
+    gammacorr = []
+
+    image_gammacorr = Image.new('L', (w, h))
+    draw = ImageDraw.Draw(image_gammacorr)
+
+    for col in range(w):
+        for row in range(h):
+            gammacorr.append(C * cdf[pix[col, row]])
+
+    # gammacorr_norm = normalize_v2(gammacorr, 255)
+    gammacorr_norm = gammacorr
+
+    i = 0
+    for col in range(w):
+        for row in range(h):
+            draw.point((col, row), int(gammacorr_norm[i]))
+            i += 1
+
+    return image_gammacorr
 
 
-def pillow_image_grayscale_hist(image):
-    pix = list(image.getdata())
-    data = pd.Series(pix)
-    return data
+def diff_by_row_for_trend(image):
+    data = []
+    for i in range(300):
+        row = []
+        for j in range(400 - 1):
+            row.append((image[i, j] + image[i, j + 1]) - image[i, j])
+        data.append(row)
+    data = np.array(data)
+    data_diff = np.diff(data)
+
+    return data, data_diff
+
+
+def image_conv(data, delta_t):
+    data_conv = []
+    for i in range(300):
+        temp = convolution(normalize_v2(data[i], 255), bsf(64, delta_t, 100, 130))
+        data_conv.append(temp[64:464])
+    data_conv = np.array(data_conv)
+
+    return data_conv

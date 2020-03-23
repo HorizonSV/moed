@@ -1,4 +1,5 @@
 from tools import *
+from scipy.misc import derivative
 import matplotlib.pyplot as plt
 import scipy.signal as sg
 import wave
@@ -937,10 +938,6 @@ def practice18_02():
 
 
 def practice25_02():
-    # Градационное преобразование
-    # + 1 Негатив
-    # + 2 Гамма-коррекция
-    # + 3 Log
     # 4 Эквализация гистограммы = CDF
     # 5 Приведение гистограммы (Обратная 4)
     # Алгоритм:
@@ -949,15 +946,21 @@ def practice25_02():
     # в) Интеграл
     # г) Корректирование
     image = read_jpg_grayscale('files/HollywoodLC.jpg')
-    data = pillow_image_grayscale_hist(image)
-    data.plot.hist(bins=50)
+    C = 400
+
+    hist = hist_v2(image)
+    plt.subplot(2, 1, 1)
+    plt.plot(range(len(hist)), hist)
+
+    cdf = cdf_calc(hist)
+    plt.subplot(2, 1, 2)
+    plt.plot(range(len(cdf)), cdf)
+
     plt.show()
-    data.plot.kde()
-    plt.show()
-    r = 2
-    data_integ = pillow_image_grayscale_grad_preobr(image, r)
-    data_integ.kde()
-    plt.show()
+
+    image_gammacorr = pillow_image_grayscale_equ(image, C, cdf)
+    image_gammacorr.show()
+
 
 def practice03_03():
     # автоКорреляцию
@@ -968,21 +971,46 @@ def practice03_03():
     # m = 16, dx = 1, bsf(m, dx, fc1, fc2, w(вес)), достаточно профильтровать каждую строчку
     # 1 Прочитать файл
     # 2 построчно инкрементом dy = 10 считать производную
-    # a) x'k
+    # a) x'kы
     # b) Rx'x'
     # c) |F[Rx'x']|
     # d) Определить параметры пика fg
     # e) bsf()
     # f) фильтр строк
     # g) Контраст
+    plt.rcParams["axes.grid"] = False
     image = read_xcr('files/h400x300.xcr')
-    a = np.array(image)
-    b = a.reshape(300, 400)
-    plt.imshow(b)
+    image = np.array(image).reshape(300, 400)
+    plt.imshow(image.transpose(0, -1), cmap='gist_gray', origin='lower')
     plt.show()
 
+    data, data_diff = diff_by_row_for_trend(image)
+    plt.imshow(data_diff.transpose(0, -1), cmap='gist_gray', origin='lower')
+    plt.show()
 
-if __name__ == "__main__":
+    C, Cs = fourie_fast(data_diff[0])
+    plt.plot(range(len(C)), C)
+    plt.title('Спектр')
+    plt.xlabel('Частота')
+    plt.ylabel('Амплитуда')
+    plt.grid(True)
+    plt.show()
+
+    fs = 400
+    delta_t = 1 / fs
+
+    data_conv = image_conv(data, delta_t)
+    plt.imshow(data_conv.transpose(0, -1), cmap='gist_gray', origin='lower')
+    plt.show()
+    # plt.imsave('someth.jpg', data_conv.transpose(0, -1), format='jpg', cmap='gist_gray', origin='lower')
+
+
+def practice17_03():
+    image = read_jpg_grayscale('files/MODEL.jpg')
+    pass
+
+
+if __name__ == "__main__":  
     # car()
     # voice()
     # voice2()
@@ -993,3 +1021,5 @@ if __name__ == "__main__":
     # practice18_02()
     # practice25_02()
     practice03_03()
+    # practice17_03()
+    pass
