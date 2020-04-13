@@ -1006,11 +1006,221 @@ def practice03_03():
 
 
 def practice17_03():
+    # 1.Изображение MODEL.jpg зашумить аддитивно:
+    # а) нормально распределенным шумом разного уровня 1 %, 5 %, 15 %;
+    # б) биполярным импульсным шумом "соль+перец";
+    # в) суммарным шумом пп.а и б;
+    # г) подавить шумы пп.а, б, в, фильтром низких частот: dt = dx = dy = 1, частот среза задаются в нормированной
+    # шкале Найквиста от 0 - 0.5, параметр m подобрать самостоятельно до лучшего результата.
+    plt.rcParams["axes.grid"] = False
     image = read_jpg_grayscale('files/MODEL.jpg')
+
+    data_a1 = add_gauss_noise(image, 1)
+    data_a5 = add_gauss_noise(image, 5)
+    data_a15 = add_gauss_noise(image, 15)
+    data_b = add_impulse_noise(image)
+    data_c = add_impulse_noise(read_jpg_grayscale('files/data_a15.jpg'))
+
+    plt.imsave('files/data_a1.jpg', data_a1, format='jpg', cmap='gist_gray', vmin=0, vmax=255)
+    plt.imsave('files/data_a5.jpg', data_a5, format='jpg', cmap='gist_gray', vmin=0, vmax=255)
+    plt.imsave('files/data_a15.jpg', data_a15, format='jpg', cmap='gist_gray', vmin=0, vmax=255)
+    plt.imsave('files/data_b.jpg', data_b, format='jpg', cmap='gist_gray', vmin=0, vmax=255)
+    plt.imsave('files/data_c.jpg', data_c, format='jpg', cmap='gist_gray', vmin=0, vmax=255)
+
+    # data_temp = np.array(image.getdata()).reshape(300, 400)
+    # print(data_temp)
+    # C, Cs = fourie_fast(data_temp[150])
+    # plt.plot(range(len(C)), C)
+    # plt.show()
+
+    fs = 400
+    delta_t = 1 / fs
+
+    data_conv_a1 = image_conv(np.array(data_a1.getdata()).reshape(300, 400), delta_t, fc1=15, m=64, type='lpf')
+    plt.imsave('files/data_conv_a1.jpg', data_conv_a1, format='jpg', cmap='gist_gray')
+    data_conv_a5 = image_conv(np.array(data_a5.getdata()).reshape(300, 400), delta_t, fc1=15, m=64, type='lpf')
+    plt.imsave('files/data_conv_a5.jpg', data_conv_a5, format='jpg', cmap='gist_gray')
+    data_conv_a15 = image_conv(np.array(data_a15.getdata()).reshape(300, 400), delta_t, fc1=15, m=64, type='lpf')
+    plt.imsave('files/data_conv_a15.jpg', data_conv_a15, format='jpg', cmap='gist_gray')
+
+    data_conv_b = image_conv(np.array(data_b.getdata()).reshape(300, 400), delta_t, fc1=15, m=64, type='lpf')
+    plt.imsave('files/data_conv_b.jpg', data_conv_b, format='jpg', cmap='gist_gray')
+
+    data_conv_c = image_conv(np.array(data_c.getdata()).reshape(300, 400), delta_t, fc1=15, m=64, type='lpf')
+    plt.imsave('files/data_conv_c.jpg', data_conv_c, format='jpg', cmap='gist_gray')
+
+
+def practice25_03():
+    plt.rcParams["axes.grid"] = False
+    image_a1 = read_jpg_grayscale('files/data_a1.jpg')
+    image_a5 = read_jpg_grayscale('files/data_a5.jpg')
+    image_a15 = read_jpg_grayscale('files/data_a15.jpg')
+    image_b = read_jpg_grayscale('files/data_b.jpg')
+    image_c = read_jpg_grayscale('files/data_c.jpg')
+
+    mask = (3, 3)
+
+    image_filtered_arif_a1 = draw_image(image_mask_filter(mask, image_a1, type='arif'), 398, 298)
+    plt.imsave('files/image_filtered_arif_a1.jpg', image_filtered_arif_a1, format='jpg', cmap='gist_gray')
+
+    image_filtered_arif_a5 = draw_image(image_mask_filter(mask, image_a5, type='arif'), 398, 298)
+    plt.imsave('files/image_filtered_arif_a5.jpg', image_filtered_arif_a5, format='jpg', cmap='gist_gray')
+
+    image_filtered_arif_a15 = draw_image(image_mask_filter(mask, image_a15, type='arif'), 398, 298)
+    plt.imsave('files/image_filtered_arif_a15.jpg', image_filtered_arif_a15, format='jpg', cmap='gist_gray')
+
+    image_filtered_arif_b = draw_image(image_mask_filter(mask, image_b, type='arif'), 398, 298)
+    plt.imsave('files/image_filtered_arif_b.jpg', image_filtered_arif_b, format='jpg', cmap='gist_gray')
+
+    image_filtered_arif_c = draw_image(image_mask_filter(mask, image_c, type='arif'), 398, 298)
+    plt.imsave('files/image_filtered_arif_c.jpg', image_filtered_arif_c, format='jpg', cmap='gist_gray')
+
+
+    image_filtered_median_a1 = draw_image(image_mask_filter(mask, image_a1, type='median'), 398, 298)
+    plt.imsave('files/image_filtered_median_a1.jpg', image_filtered_median_a1, format='jpg', cmap='gist_gray')
+
+    image_filtered_median_a5 = draw_image(image_mask_filter(mask, image_a5, type='median'), 398, 298)
+    plt.imsave('files/image_filtered_median_a5.jpg', image_filtered_median_a5, format='jpg', cmap='gist_gray')
+
+    image_filtered_median_a15 = draw_image(image_mask_filter(mask, image_a15, type='median'), 398, 298)
+    plt.imsave('files/image_filtered_median_a15.jpg', image_filtered_median_a15, format='jpg', cmap='gist_gray')
+
+    image_filtered_median_b = draw_image(image_mask_filter(mask, image_b, type='median'), 398, 298)
+    plt.imsave('files/image_filtered_median_b.jpg', image_filtered_median_b, format='jpg', cmap='gist_gray')
+
+    image_filtered_median_c = draw_image(image_mask_filter(mask, image_c, type='median'), 398, 298)
+    plt.imsave('files/image_filtered_median_c.jpg', image_filtered_median_c, format='jpg', cmap='gist_gray')
+
+def practice07_04():
+    # Восстановить смазанное изображение методом деконволюции
+    plt.rcParams["axes.grid"] = False
+    image = np.array(binary_reader('files/practice07_04/blur307x221D.dat')).reshape(221, 307)
+    image_N = np.array(binary_reader('files/practice07_04/blur307x221D_N.dat')).reshape(221, 307)
+    kern = np.array(binary_reader('files/practice07_04/kernD76_f4.dat'))
+
+    plt.subplot(2, 3, 1)
+    plt.imshow(image, cmap='gist_gray')
+    plt.title('blur307x221D')
+
+    plt.subplot(2, 3, 2)
+    plt.imshow(image_N, cmap='gist_gray')
+    plt.title('blur307x221D_N')
+
+    plt.subplot(2, 3, 3)
+    plt.plot(range(len(kern)), kern)
+    plt.title('kernD76_f4')
+
+    image_fourie = []
+    for row in range(image.shape[0]):
+        image_fourie.append(fourie_fast_cs(image[row]))
+    image_fourie = np.array(image_fourie)
+    print("image_fourie", image_fourie.shape)
+
+    kern_zero = []
+    for i in range(image.shape[1]):
+        if i < 76:
+            kern_zero.append(kern[i])
+        else:
+            kern_zero.append(0)
+    print("kern_zero", np.array(kern_zero).shape)
+    plt.subplot(2, 3, 6)
+    plt.plot(range(len(kern_zero)), kern_zero)
+    plt.title('kern zero')
+
+    kern_fourie = fourie_fast_cs(kern_zero)
+    print("kern_fourie", np.array(kern_fourie).shape)
+
+    # kern_zero = []
+    # for i in range(image_fourie.shape[1]):
+    #     if i < 38:
+    #         kern_zero.append(kern_fourie[i])
+    #     else:
+    #         kern_zero.append(0)
+    # kern_fourie = kern_zero
+    # print("kern_fourie2", np.array(kern_fourie).shape)
+
+    # fur_kern = []
+    # for i in range(fur.shape[1]):
+    #     if i < 76:
+    #         fur_kern.append(fur_kern2[i])
+    #     else:
+    #         fur_kern.append(0)
+
+    deconv = np.array(image_deconv(image_fourie, kern_fourie))
+    print("deconv", deconv.shape)
+
+    image_noblur = []
+    for i in range(deconv.shape[0]):
+        image_noblur.append(reverse_fourie(deconv[i]))
+
+    print("image", np.array(image).shape)
+    print("image_noblur", np.array(image_noblur).shape)
+
+    plt.subplot(2, 3, 4)
+    plt.imshow(image_noblur, cmap='gist_gray')
+    plt.title('image_noblur')
+    plt.show()
+
+
+def test124():
+    # Восстановить смазанное изображение методом деконволюции
+    # Не использовать numpy
+    plt.rcParams["axes.grid"] = False
+    image = np.array(binary_reader('files/practice07_04/blur307x221D.dat')).reshape(221, 307).tolist()
+    image_N = np.array(binary_reader('files/practice07_04/blur307x221D_N.dat')).reshape(221, 307).tolist()
+    kern = binary_reader('files/practice07_04/kernD76_f4.dat')
+
+    plt.subplot(2, 3, 1)
+    plt.imshow(image, cmap='gist_gray')
+    plt.title('blur307x221D')
+
+    plt.subplot(2, 3, 2)
+    plt.imshow(image_N, cmap='gist_gray')
+    plt.title('blur307x221D_N')
+
+    plt.subplot(2, 3, 3)
+    plt.plot(range(len(kern)), kern)
+    plt.title('kernD76_f4')
+
+    print(len(image))
+
+    image_fourie = []
+    for row in range(len(image)):
+        image_fourie.append(fourie_fast_cs(image[row]))
+    print("image_fourie", len(image_fourie))
+
+    kern_zero = []
+    for i in range(307):
+        if i < 76:
+            kern_zero.append(kern[i])
+        else:
+            kern_zero.append(0)
+    print("kern_zero", len(kern_zero))
+    plt.subplot(2, 3, 6)
+    plt.plot(range(len(kern_zero)), kern_zero)
+    plt.title('kern zero')
+
+    kern_fourie = fourie_fast_cs(kern_zero)
+    print("kern_fourie", len(kern_fourie))
+
+    deconv = image_deconv(image_fourie, kern_fourie)
+    print("deconv", len(deconv))
+
+    image_noblur = []
+    for i in range(len(deconv)):
+        image_noblur.append(reverse_fourie(deconv[i]))
+
+    print("image", len(image))
+    print("image_noblur", len(image_noblur))
+
+    plt.subplot(2, 3, 4)
+    plt.imshow(image_noblur, cmap='gist_gray', vmin=0, vmax=255)
+    plt.title('image_noblur')
+    plt.show()
     pass
 
 
-if __name__ == "__main__":  
+if __name__ == "__main__":
     # car()
     # voice()
     # voice2()
@@ -1020,6 +1230,9 @@ if __name__ == "__main__":
     # practice11_02()
     # practice18_02()
     # practice25_02()
-    practice03_03()
+    # practice03_03()
     # practice17_03()
+    # practice25_03()
+    # practice07_04()
+    test124()
     pass

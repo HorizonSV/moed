@@ -444,6 +444,31 @@ def fourie_fast(func):
     return C, Cs
 
 
+def fourie_fast_cs(func):
+    """
+    Преобразование Фурье
+    """
+    Re = []
+    Im = []
+    C = []
+    Cs = []
+    N = len(func)
+    for n in range(round(N/2)):
+        sumRe = 0
+        sumIm = 0
+        for k in range(N):
+            sumRe += func[k] * np.cos((2 * np.pi * n * k) / N)
+            sumIm += func[k] * np.sin((2 * np.pi * n * k) / N)
+        re = sumRe / N
+        im = sumIm / N
+
+        Re.append(re)
+        Im.append(im)
+        C.append(np.sqrt(pow(re, 2) + pow(im, 2)))  # модуль комлпексного спектра (амплитудный спектр)
+        Cs.append(re + im)  # Спектр Фурье
+    return Cs
+
+
 def del_complex(re1, im1, re2, im2):
     re = (re1 * re2 + im1 * im2) / (re2 * re2 + im2 * im2)
     im = (im1 * re2 - re1 * im2) / (re2 * re2 + im2 * im2)
@@ -596,6 +621,34 @@ def convolution(x, h):
                 pass
             else:
                 total_sum += x[index] * h[m]
+
+        y.append(total_sum)
+        total_sum = 0
+    return y
+
+
+def deconvolution(x, h):
+    """
+    Функция связки y = x / h
+    """
+    alpha = 0.1
+    K = alpha ** 2
+    K = 0.00001
+
+    y = []
+    N = len(x)
+    M = len(h)
+    total_sum = 0
+    for k in range(N + M - 1):
+        for m in range(M):
+            index = k - m
+            if index < 0:
+                pass
+            if index > N - 1:
+                pass
+            else:
+                # total_sum += x[index] / h[m]
+                total_sum += x[index] * (h[m] / (abs(h[m] ** 2) + K))
 
         y.append(total_sum)
         total_sum = 0
@@ -952,11 +1005,106 @@ def diff_by_row_for_trend(image):
     return data, data_diff
 
 
-def image_conv(data, delta_t):
+def image_conv(data, delta_t, fc1, fc2=0, type='lpf', m=32):
     data_conv = []
     for i in range(300):
-        temp = convolution(normalize_v2(data[i], 255), bsf(64, delta_t, 100, 130))
-        data_conv.append(temp[64:464])
-    data_conv = np.array(data_conv)
+        if type == 'lpf':
+            temp = convolution(data[i], lpf(m, delta_t, fc1))
+        elif type == 'hpf':
+            temp = convolution(normalize_v2(data[i], 255), hpf(m, delta_t, fc1))
+        elif type == 'bsf':
+            temp = convolution(normalize_v2(data[i], 255), bsf(m, delta_t, fc1, fc2))
+        else:
+            raise ValueError('Wrong type')
 
-    return data_conv
+        data_conv.append(temp[m:400+m])
+
+    return np.array(data_conv)
+
+
+# Функция добавляет аддитивный шум Гаусса на картинку
+def add_gauss_noise(image, level):
+    w, h = image.size[0], image.size[1]
+    pixels = image.load()  # Выгружаем значения пикселей
+
+    # моделируем Гауссовский шум
+    mu, sigma = 0.2, level
+    gaussNoise = np.random.normal(mu, sigma, size=[w, h])
+
+    # Добавление шума на изображение
+    noisedImage = []
+    for col in range(w):
+        for row in range(h):
+            noisedImage.append(pixels[col, row] + gaussNoise[col, row])
+
+    # Рисование изображения с шумом
+    image_add_noise = draw_image(noisedImage, w, h)
+
+    return image_add_noise
+
+
+def add_impulse_noise(image, Pa=0.05, Pb=0.1):
+    pix = image.load()
+    w, h = image.size[0], image.size[1]
+
+    pixels_1d = []
+    for col in range(w):
+        for row in range(h):
+            pixels_1d.append(pix[col, row])
+
+    # Моделируем импульсный шум
+    a = 0
+    b = 255
+    randVals = np.random.uniform(low=0.0, high=1.0, size=(w * h))
+    noisedImpulse = pixels_1d.copy()
+
+    for i in range(w * h):
+        if randVals[i] < Pa:
+            noisedImpulse[i] = a
+        elif Pa < randVals[i] < (Pa + Pb):
+            noisedImpulse[i] = b
+
+    # Рисование изображения с шумом
+    image_impulse_noise = draw_image(noisedImpulse, w, h)
+
+    return image_impulse_noise
+
+
+def draw_image(pix, w, h):
+    image = Image.new('L', (w, h))
+    draw = ImageDraw.Draw(image)
+    k = 0
+    for col in range(w):
+        for row in range(h):
+            draw.point((col, row), int(pix[k]))
+            k += 1
+
+    return image
+
+
+def image_mask_filter(mask, image, type):
+    pix = image.load()
+    w, h = image.size[0], image.size[1]
+
+    new_image = []
+    for col in range(2, w):
+        for row in range(2, h):
+            data = []
+            for i in range(mask[0] - 1):
+                for j in range(mask[1] - 1):
+                    data.append(pix[col - i, row - j])
+            if type == 'arif':
+                new_image.append(sum(data) / (mask[0] * mask[1]))
+            elif type == 'median':
+                new_image.append(np.median(data))
+            else:
+                raise ValueError('Wrong type')
+
+    return new_image
+
+
+def image_deconv(g, h):
+    deconv = []
+    for i in range(len(g)):
+        deconv.append(deconvolution(g[i], h))
+    return deconv
