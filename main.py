@@ -5,6 +5,7 @@ import scipy.signal as sg
 import wave
 import struct
 import numpy as np
+import cv2
 import pandas as pd
 from PIL import Image, ImageDraw
 plt.style.use('ggplot')
@@ -946,7 +947,7 @@ def practice25_02():
     # в) Интеграл
     # г) Корректирование
     image = read_jpg_grayscale('files/HollywoodLC.jpg')
-    C = 400
+    C = 200
 
     hist = hist_v2(image)
     plt.subplot(2, 1, 1)
@@ -1091,132 +1092,587 @@ def practice25_03():
     image_filtered_median_c = draw_image(image_mask_filter(mask, image_c, type='median'), 398, 298)
     plt.imsave('files/image_filtered_median_c.jpg', image_filtered_median_c, format='jpg', cmap='gist_gray')
 
+
 def practice07_04():
     # Восстановить смазанное изображение методом деконволюции
     plt.rcParams["axes.grid"] = False
-    image = np.array(binary_reader('files/practice07_04/blur307x221D.dat')).reshape(221, 307)
-    image_N = np.array(binary_reader('files/practice07_04/blur307x221D_N.dat')).reshape(221, 307)
-    kern = np.array(binary_reader('files/practice07_04/kernD76_f4.dat'))
+    # file_name = 'files/practice07_04/blur307x221D.dat'  # Изображение без шумов
+    file_name = 'files/practice07_04/blur307x221D_N.dat'  # Изображение с шумами
+    kern = 'files/practice07_04/kernD76_f4.dat'  # Массив значений ядра смазывающей функции
 
-    plt.subplot(2, 3, 1)
-    plt.imshow(image, cmap='gist_gray')
-    plt.title('blur307x221D')
+    data = binary_reader(file_name)
+    function_core = binary_reader(kern)
 
-    plt.subplot(2, 3, 2)
-    plt.imshow(image_N, cmap='gist_gray')
-    plt.title('blur307x221D_N')
+    width, height = 307, 221
+    matrix_pix = np.array(data).reshape(height, width)
 
-    plt.subplot(2, 3, 3)
-    plt.plot(range(len(kern)), kern)
-    plt.title('kernD76_f4')
+    plt.imshow(matrix_pix, cmap='gist_gray', origin='lower')
+    plt.show()
 
-    image_fourie = []
-    for row in range(image.shape[0]):
-        image_fourie.append(fourie_fast_cs(image[row]))
-    image_fourie = np.array(image_fourie)
-    print("image_fourie", image_fourie.shape)
+    # deconv_matrix_pix = image_deconvolution(matrix_pix, function_core)
+    deconv_matrix_pix = optimal_image_deconvolution(matrix_pix, function_core, 0.00001)
 
-    kern_zero = []
-    for i in range(image.shape[1]):
-        if i < 76:
-            kern_zero.append(kern[i])
-        else:
-            kern_zero.append(0)
-    print("kern_zero", np.array(kern_zero).shape)
-    plt.subplot(2, 3, 6)
-    plt.plot(range(len(kern_zero)), kern_zero)
-    plt.title('kern zero')
-
-    kern_fourie = fourie_fast_cs(kern_zero)
-    print("kern_fourie", np.array(kern_fourie).shape)
-
-    # kern_zero = []
-    # for i in range(image_fourie.shape[1]):
-    #     if i < 38:
-    #         kern_zero.append(kern_fourie[i])
-    #     else:
-    #         kern_zero.append(0)
-    # kern_fourie = kern_zero
-    # print("kern_fourie2", np.array(kern_fourie).shape)
-
-    # fur_kern = []
-    # for i in range(fur.shape[1]):
-    #     if i < 76:
-    #         fur_kern.append(fur_kern2[i])
-    #     else:
-    #         fur_kern.append(0)
-
-    deconv = np.array(image_deconv(image_fourie, kern_fourie))
-    print("deconv", deconv.shape)
-
-    image_noblur = []
-    for i in range(deconv.shape[0]):
-        image_noblur.append(reverse_fourie(deconv[i]))
-
-    print("image", np.array(image).shape)
-    print("image_noblur", np.array(image_noblur).shape)
-
-    plt.subplot(2, 3, 4)
-    plt.imshow(image_noblur, cmap='gist_gray')
-    plt.title('image_noblur')
+    plt.imshow(deconv_matrix_pix, cmap='gist_gray', origin='lower')
     plt.show()
 
 
-def test124():
-    # Восстановить смазанное изображение методом деконволюции
-    # Не использовать numpy
+def practice16_04():
+    # Сегментировать контуры объектов в изображении model.jpg без шумов и с шумами 15% двумя способами, в которых
+    # ключевым элементом является:
+    # 1) ФНЧ 2) ФВЧ
+    # В обоих случаях можно применять пороговые преобразования и
+    # арифметические операции с изображениями. Обосновать последовательность применения всех преобразований и их
+    # параметры.
     plt.rcParams["axes.grid"] = False
-    image = np.array(binary_reader('files/practice07_04/blur307x221D.dat')).reshape(221, 307).tolist()
-    image_N = np.array(binary_reader('files/practice07_04/blur307x221D_N.dat')).reshape(221, 307).tolist()
-    kern = binary_reader('files/practice07_04/kernD76_f4.dat')
+    image = read_jpg_grayscale('files/MODEL.jpg')
+    image_a15 = read_jpg_grayscale('files/data_a15.jpg')
+    image_c = add_impulse_noise(read_jpg_grayscale('files/data_a15.jpg'))
 
-    plt.subplot(2, 3, 1)
-    plt.imshow(image, cmap='gist_gray')
-    plt.title('blur307x221D')
+    fs = 1
+    delta_t = 1 / fs
 
-    plt.subplot(2, 3, 2)
-    plt.imshow(image_N, cmap='gist_gray')
-    plt.title('blur307x221D_N')
+    # data_temp = np.array(image.getdata()).reshape(300, 400)
+    # print(data_temp)
+    # C, Cs = fourie_fast(data_temp[150])
+    # plt.plot(np.linspace(0, 0.5, num=200), C)
+    # plt.show()
 
-    plt.subplot(2, 3, 3)
-    plt.plot(range(len(kern)), kern)
-    plt.title('kernD76_f4')
+    # Фильтрация LPF HPF
+    # print("Convolving image with lpf...")
+    # data_conv_lpf = image_conv(np.array(image.getdata()).reshape(300, 400), delta_t, fc1=0.005, m=8, type='lpf')
+    # plt.imsave('files/practice16_04/data_conv_lpf.jpg', data_conv_lpf, format='jpg', cmap='gist_gray')
+    # print("Done")
+    #
+    # print("Convolving image with hpf...")
+    # data_conv_hpf = image_conv(np.array(image.getdata()).reshape(300, 400), delta_t, fc1=0.005, m=8, type='hpf')
+    # plt.imsave('files/practice16_04/data_conv_hpf.jpg', data_conv_hpf, format='jpg', cmap='gist_gray')
+    # print("Done")
+    #
+    # print("Convolving image_a15 with lpf...")
+    # data_a15_conv_lpf = image_conv(np.array(image_a15.getdata()).reshape(300, 400), delta_t, fc1=0.005, m=8, type='lpf')
+    # plt.imsave('files/practice16_04/data_a15_conv_lpf.jpg', data_a15_conv_lpf, format='jpg', cmap='gist_gray')
+    # print("Done")
+    #
+    # print("Convolving image_a15 with hpf...")
+    # data_a15_conv_hpf = image_conv(np.array(image_a15.getdata()).reshape(300, 400), delta_t, fc1=0.005, m=8, type='hpf')
+    # plt.imsave('files/practice16_04/data_a15_conv_hpf.jpg', data_a15_conv_hpf, format='jpg', cmap='gist_gray')
+    # print("Done")
+    #
+    # print("Convolving image_c with lpf...")
+    # data_c_conv_lpf = image_conv(np.array(image_c.getdata()).reshape(300, 400), delta_t, fc1=0.005, m=8, type='lpf')
+    # plt.imsave('files/practice16_04/data_c_conv_lpf.jpg', data_c_conv_lpf, format='jpg', cmap='gist_gray')
+    # print("Done")
+    #
+    # print("Convolving image_c with hpf...")
+    # data_c_conv_hpf = image_conv(np.array(image_c.getdata()).reshape(300, 400), delta_t, fc1=0.005, m=8, type='hpf')
+    # plt.imsave('files/practice16_04/data_c_conv_hpf.jpg', data_c_conv_hpf, format='jpg', cmap='gist_gray')
+    # print("Done")
 
-    print(len(image))
+    # Дополнительная фильтрация
+    image_lpf = read_jpg_grayscale('files/practice16_04/data_conv_lpf.jpg')
+    image_hpf = read_jpg_grayscale('files/practice16_04/data_conv_hpf.jpg')
+    image_a15_lpf = read_jpg_grayscale('files/practice16_04/data_a15_conv_lpf.jpg')
+    image_a15_hpf = read_jpg_grayscale('files/practice16_04/data_a15_conv_hpf.jpg')
+    image_c_lpf = read_jpg_grayscale('files/practice16_04/data_c_conv_lpf.jpg')
+    image_c_hpf = read_jpg_grayscale('files/practice16_04/data_c_conv_hpf.jpg')
+    mask = (3, 3)
 
-    image_fourie = []
-    for row in range(len(image)):
-        image_fourie.append(fourie_fast_cs(image[row]))
-    print("image_fourie", len(image_fourie))
 
-    kern_zero = []
-    for i in range(307):
-        if i < 76:
-            kern_zero.append(kern[i])
-        else:
-            kern_zero.append(0)
-    print("kern_zero", len(kern_zero))
-    plt.subplot(2, 3, 6)
-    plt.plot(range(len(kern_zero)), kern_zero)
-    plt.title('kern zero')
+    image_lpf_filtered_arif = draw_image(image_mask_filter(mask, image_lpf, type='arif'), 398, 298)
+    plt.imsave('files/practice16_04/image_lpf_filtered_arif.jpg', image_lpf_filtered_arif, format='jpg',
+               cmap='gist_gray')
+    image_lpf_filtered_median = draw_image(image_mask_filter(mask, image_lpf, type='median'), 398, 298)
+    plt.imsave('files/practice16_04/image_lpf_filtered_median.jpg', image_lpf_filtered_median, format='jpg',
+               cmap='gist_gray')
 
-    kern_fourie = fourie_fast_cs(kern_zero)
-    print("kern_fourie", len(kern_fourie))
+    image_hpf_filtered_arif = draw_image(image_mask_filter(mask, image_hpf, type='arif'), 398, 298)
+    plt.imsave('files/practice16_04/image_hpf_filtered_arif.jpg', image_hpf_filtered_arif, format='jpg',
+               cmap='gist_gray')
+    image_hpf_filtered_median = draw_image(image_mask_filter(mask, image_hpf, type='median'), 398, 298)
+    plt.imsave('files/practice16_04/image_hpf_filtered_median.jpg', image_hpf_filtered_median, format='jpg',
+               cmap='gist_gray')
 
-    deconv = image_deconv(image_fourie, kern_fourie)
-    print("deconv", len(deconv))
 
-    image_noblur = []
-    for i in range(len(deconv)):
-        image_noblur.append(reverse_fourie(deconv[i]))
+    image_a15_lpf_filtered_arif = draw_image(image_mask_filter(mask, image_a15_lpf, type='arif'), 398, 298)
+    plt.imsave('files/practice16_04/image_a15_lpf_filtered_arif.jpg', image_a15_lpf_filtered_arif, format='jpg',
+               cmap='gist_gray')
+    image_a15_lpf_filtered_median = draw_image(image_mask_filter(mask, image_a15_lpf, type='median'), 398, 298)
+    plt.imsave('files/practice16_04/image_a15_lpf_filtered_median.jpg', image_a15_lpf_filtered_median, format='jpg',
+               cmap='gist_gray')
 
-    print("image", len(image))
-    print("image_noblur", len(image_noblur))
+    image_a15_hpf_filtered_arif = draw_image(image_mask_filter(mask, image_a15_hpf, type='arif'), 398, 298)
+    plt.imsave('files/practice16_04/image_a15_hpf_filtered_arif.jpg', image_a15_hpf_filtered_arif, format='jpg',
+               cmap='gist_gray')
+    image_a15_hpf_filtered_median = draw_image(image_mask_filter(mask, image_a15_hpf, type='median'), 398, 298)
+    plt.imsave('files/practice16_04/image_a15_hpf_filtered_median.jpg', image_a15_hpf_filtered_median, format='jpg',
+               cmap='gist_gray')
 
-    plt.subplot(2, 3, 4)
-    plt.imshow(image_noblur, cmap='gist_gray', vmin=0, vmax=255)
-    plt.title('image_noblur')
+
+    image_c_lpf_filtered_arif = draw_image(image_mask_filter(mask, image_c_lpf, type='arif'), 398, 298)
+    plt.imsave('files/practice16_04/image_c_lpf_filtered_arif.jpg', image_c_lpf_filtered_arif, format='jpg',
+               cmap='gist_gray')
+    image_c_lpf_filtered_median = draw_image(image_mask_filter(mask, image_c_lpf, type='median'), 398, 298)
+    plt.imsave('files/practice16_04/image_c_lpf_filtered_median.jpg', image_c_lpf_filtered_median, format='jpg',
+               cmap='gist_gray')
+
+    image_c_hpf_filtered_arif = draw_image(image_mask_filter(mask, image_c_hpf, type='arif'), 398, 298)
+    plt.imsave('files/practice16_04/image_c_hpf_filtered_arif.jpg', image_c_hpf_filtered_arif, format='jpg',
+               cmap='gist_gray')
+    image_c_hpf_filtered_median = draw_image(image_mask_filter(mask, image_c_hpf, type='median'), 398, 298)
+    plt.imsave('files/practice16_04/image_c_hpf_filtered_median.jpg', image_c_hpf_filtered_median, format='jpg',
+               cmap='gist_gray')
+
+
+    # Пороговое преобразование
+    image_lpf_filtered_arif_thresholding = thresholding(image_lpf_filtered_arif, 110)
+    plt.imsave('files/practice16_04/threshold/image_lpf_filtered_arif_thresholding.jpg',
+               np.array(image_lpf_filtered_arif_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+    image_lpf_filtered_median_thresholding = thresholding(image_lpf_filtered_median, 120)
+    plt.imsave('files/practice16_04/threshold/image_lpf_filtered_median_thresholding.jpg',
+               np.array(image_lpf_filtered_median_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+    image_hpf_filtered_arif_thresholding = thresholding(image_hpf_filtered_arif, 40)
+    plt.imsave('files/practice16_04/threshold/image_hpf_filtered_arif_thresholding.jpg',
+               np.array(image_hpf_filtered_arif_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+    image_hpf_filtered_median_thresholding = thresholding(image_hpf_filtered_median, 80)
+    plt.imsave('files/practice16_04/threshold/image_hpf_filtered_median_thresholding.jpg',
+               np.array(image_hpf_filtered_median_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+
+    image_a15_lpf_filtered_arif_thresholding = thresholding(image_a15_lpf_filtered_arif, 80)
+    plt.imsave('files/practice16_04/threshold/image_a15_lpf_filtered_arif_thresholding.jpg',
+               np.array(image_a15_lpf_filtered_arif_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+    image_a15_lpf_filtered_median_thresholding = thresholding(image_a15_lpf_filtered_median, 180)
+    plt.imsave('files/practice16_04/threshold/image_a15_lpf_filtered_median_thresholding.jpg',
+               np.array(image_a15_lpf_filtered_median_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+    image_a15_hpf_filtered_arif_thresholding = thresholding(image_a15_hpf_filtered_arif, 50)
+    plt.imsave('files/practice16_04/threshold/image_a15_hpf_filtered_arif_thresholding.jpg',
+               np.array(image_a15_hpf_filtered_arif_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+    image_a15_hpf_filtered_median_thresholding = thresholding(image_a15_hpf_filtered_median, 110)
+    plt.imsave('files/practice16_04/threshold/image_a15_hpf_filtered_median_thresholding.jpg',
+               np.array(image_a15_hpf_filtered_median_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+
+    image_c_lpf_filtered_arif_thresholding = thresholding(image_c_lpf_filtered_arif, 80)
+    plt.imsave('files/practice16_04/threshold/image_c_lpf_filtered_arif_thresholding.jpg',
+               np.array(image_c_lpf_filtered_arif_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+    image_c_lpf_filtered_median_thresholding = thresholding(image_c_lpf_filtered_median, 170)
+    plt.imsave('files/practice16_04/threshold/image_c_lpf_filtered_median_thresholding.jpg',
+               np.array(image_c_lpf_filtered_median_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+    image_c_hpf_filtered_arif_thresholding = thresholding(image_c_hpf_filtered_arif, 60)
+    plt.imsave('files/practice16_04/threshold/image_c_hpf_filtered_arif_thresholding.jpg',
+               np.array(image_c_hpf_filtered_arif_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+    image_c_hpf_filtered_median_thresholding = thresholding(image_c_hpf_filtered_median, 120)
+    plt.imsave('files/practice16_04/threshold/image_c_hpf_filtered_median_thresholding.jpg',
+               np.array(image_c_hpf_filtered_median_thresholding).reshape(398, 298), format='jpg', cmap='gist_gray')
+
+
+def practice21_04():
+    # C помощью градиента и лапласиана получить контуры
+    plt.rcParams["axes.grid"] = False
+    image = np.array(read_jpg_grayscale('files/MODEL.jpg')).reshape(300, 400)
+    # image = np.array(read_jpg_grayscale('files/data_a15.jpg')).reshape(300, 400)
+    # image = np.array(add_impulse_noise(read_jpg_grayscale('files/data_b.jpg'))).reshape(300, 400)
+    sobel_x = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
+    sobel_y = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
+
+    data_diff_x = diff(image, 'x', image.shape)
+    data_diff_y = diff(image, 'y', image.shape)
+
+    data_diff_x2 = diff(data_diff_x, 'x', np.array(data_diff_x).shape)
+    data_diff_y2 = diff(data_diff_y, 'y', np.array(data_diff_y).shape)
+
+    data_diff_x = np.array(thresholding_noimage_low(data_diff_x, 240)).reshape(300, 399)
+    data_diff_y = np.array(thresholding_noimage_low(data_diff_y, 240)).reshape(400, 299)
+
+    plt.subplot(2, 2, 1)
+    plt.imshow(data_diff_x, cmap='gist_gray')
+    plt.title('Gx')
+
+    data_diff_y = data_diff_y.transpose(1, 0)
+
+    plt.subplot(2, 2, 2)
+    plt.imshow(data_diff_y, cmap='gist_gray')
+    plt.title('Gy')
+
+    data = np.array(gradient_pribl(data_diff_x, data_diff_y, sobel_x, sobel_y)).reshape(298, 398)
+
+    plt.subplot(2, 2, 3)
+    plt.imshow(data, cmap='gist_gray')
+    plt.title('Gradient')
+
+    data_th = np.array(to_binary(data)).reshape(298, 398)
+
+    plt.subplot(2, 2, 4)
+    plt.imshow(data_th, cmap='gist_gray')
+    plt.title('Gradient after bin')
+
     plt.show()
+
+    # Лапласиан
+
+    data_diff_x2 = np.array(thresholding_noimage_low(data_diff_x2, 240)).reshape(300, 398)
+    data_diff_y2 = np.array(thresholding_noimage_low(data_diff_y2, 240)).reshape(299, 399)
+
+    plt.subplot(2, 2, 1)
+    plt.imshow(data_diff_x2, cmap='gist_gray')
+    plt.title('G"x')
+
+    plt.subplot(2, 2, 2)
+    plt.imshow(data_diff_y2, cmap='gist_gray')
+    plt.title('G"y')
+
+    data = np.array(laplasian(image, data_diff_x2, data_diff_y2)).reshape(298, 397)
+
+    plt.subplot(2, 2, 3)
+    plt.imshow(data, cmap='gist_gray')
+    plt.title('Laplasian')
+
+    data = np.array(thresholding_noimage_low(data, 240, 10)).reshape(298, 397)
+    plt.subplot(2, 2, 4)
+    plt.imshow(np.array(to_negative(data)).reshape(298, 397), cmap='gist_gray')
+    plt.title('Laplasian after bin')
+    plt.show()
+
+
+def practice28_04():
+    # Применить морфологический фильтр к тем же картинка для выявления контура: 1) Применить дилатацию. 2) Эрозия
+    plt.rcParams["axes.grid"] = False
+    image = read_jpg_grayscale('files/MODEL.jpg')
+    # image = np.array(read_jpg_grayscale('files/data_a15.jpg')).reshape(300, 400)
+    # image = np.array(add_impulse_noise(read_jpg_grayscale('files/data_b.jpg'))).reshape(300, 400)
+    # image = np.array(add_impulse_noise(read_jpg_grayscale('files/data_c.jpg'))).reshape(300, 400)
+    img = cv2.imread('files/data_c.jpg', 0)
+
+    kernel = np.ones((3, 3), np.uint8)
+
+    (thresh, THimg) = cv2.threshold(img, 200, 250, cv2.THRESH_BINARY)
+
+    imgErosion = cv2.erode(THimg, kernel, iterations=1)
+    imgDilation = cv2.dilate(THimg, kernel, iterations=1)
+
+    input_Sub_erosion = THimg - imgErosion
+    dilation_Sub_input = imgDilation - THimg
+
+    cv2.imshow('Input', img)
+    cv2.imshow('Input after threshold', THimg)
+    cv2.imshow('Erosion', imgErosion)
+    cv2.imshow('Dilation', imgDilation)
+    cv2.imshow('THinput - THerosion', input_Sub_erosion)
+    cv2.imshow('THdilation - THinput', dilation_Sub_input)
+    # cv2.imshow('input - erosion', input_Sub_erosion)
+    # cv2.imshow('dilation - input', dilation_Sub_input)
+    # cv2.imshow('TH input - erosion', thresholdSubErosion)
+    # cv2.imshow('TH dilation - input', thresholdSubDilation)
+
+    cv2.waitKey(0)
+    pass
+
+
+def practice05_05():
+    # Используя методы:
+    # - изменения размеров;
+    # - сегментации;
+    # - пространственной и частотной обработки;
+    # - градационных преобразований.
+    # Разработать и реализовать максимально автоматизированный или автоматический алгоритм настройки оптимальной
+    # яркости и конрастности четырех изображений вертикальных и горизонтальных МРТ срезов - 2 для позвоночника и 2
+    # для головы, приведя изображения к размерам 400х400.
+    # Формат данных двоичный, целочисленный 2 - хбайтовый(short).
+
+    plt.rcParams["axes.grid"] = False
+
+    # brainH = np.array(binary_reader_short('files/practice05_05/brain-H_x512.bin')).reshape(512, 512)
+    # plt.imsave('files/practice05_05/brainH.jpg', brainH, format='jpg', cmap='gist_gray')
+    # brainV = np.array(binary_reader_short('files/practice05_05/brain-V_x256.bin')).reshape(256, 256)
+    # plt.imsave('files/practice05_05/brainV.jpg', brainV, format='jpg', cmap='gist_gray')
+    # spineH = np.array(binary_reader_short('files/practice05_05/spine-H_x256.bin')).reshape(256, 256)
+    # plt.imsave('files/practice05_05/spineH.jpg', spineH, format='jpg', cmap='gist_gray')
+    # spineV = np.array(binary_reader_short('files/practice05_05/spine-V_x512.bin')).reshape(512, 512)
+    # plt.imsave('files/practice05_05/spineV.jpg', spineV, format='jpg', cmap='gist_gray')
+
+    # image = read_jpg_grayscale('files/practice05_05/brainH.jpg')
+    # image = read_jpg_grayscale('files/practice05_05/brainV.jpg')
+    # image = read_jpg_grayscale('files/practice05_05/spineH.jpg')
+    image = read_jpg_grayscale('files/practice05_05/spineV.jpg')
+
+    # Замыкание
+    imgDilation = dilationErosion_forSegment('files/practice05_05/spineV.jpg', 15)
+
+    # cdf
+    hist = hist_v2_withSegment(image, imgDilation)
+    plt.subplot(2, 1, 1)
+    plt.plot(range(len(hist)), hist)
+
+    cdf = cdf_calc(hist)
+    plt.subplot(2, 1, 2)
+    plt.plot(range(len(cdf)), cdf)
+
+    image_cdf = pillow_image_grayscale_equ(image, 400, cdf)
+    image_cdf.save("files/practice05_05/image_cdf.jpg", "JPEG")
+
+    image = read_jpg_grayscale('files/practice05_05/image_cdf.jpg')
+
+    cut = 400
+    w, h = image.size
+    factor = w / cut
+
+    if w > cut:
+        fs = w
+        delta_t = 1 / fs
+
+        image_conv = image_conv_forimage(image, delta_t, cut/2)
+        plt.imsave('files/practice05_05/image_conv.jpg', image_conv.transpose(0, -1), format='jpg', cmap='gist_gray')
+        image_conv = read_jpg_grayscale('files/practice05_05/image_conv.jpg')
+    else:
+        image_conv = image
+
+    image_conv_resized = pillow_image_grayscale_resize(image_conv, factor, type='nearest', mode='decrease')
+    image_conv_resized.save("files/practice05_05/image_conv_resized.jpg", "JPEG")
+
+
+def practice12_05_old():
+    # Применяя все реализованные методы обработки и анализа изображений, а также любые сторонние методы/библиотеки
+    # помимо реализованных, выделить и автоматически подсчитать на изображении stones.jpg камни заданного размера S
+    # в двух вариантах:
+    # 1. Выделить только те объекты, у которых размер по каждому из направлений равен S.
+    # 2. Выделить камни, у которых размер хотя бы по одному направлению равен S, а в остальных направлениях меньше S.
+    plt.rcParams["axes.grid"] = False
+    # image = read_jpg_grayscale('files/practice12_05/stones.jpg')
+    S = 13
+    factor = 4
+    S = S * factor
+    kernel = np.ones((5, 5), np.uint8)
+
+    # параметры цветового фильтра
+    hsv_min = np.array((0, 0, 0), np.uint8)
+    hsv_max = np.array((255, 255, 130), np.uint8)
+
+    img = cv2.imread('files/practice12_05/stones.jpg')
+
+    scale_percent = 100 * factor
+
+    width = int(img.shape[1] * scale_percent / 100)
+    height = int(img.shape[0] * scale_percent / 100)
+    dsize = (width, height)
+    img = cv2.resize(img, dsize)
+
+    # меняем цветовую модель с BGR на HSV
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    # применяем цветовой фильтр
+    thresh = cv2.inRange(hsv, hsv_min, hsv_max)
+    cv2.imwrite("files/practice12_05/thresh_before.jpg", thresh)
+
+    thresh = cv2.dilate(thresh, kernel)
+    thresh = cv2.erode(thresh, kernel)
+    cv2.imwrite("files/practice12_05/thresh_after.jpg", thresh)
+
+    # ищем контуры и складируем их в переменную contours
+    contours, hierarchy = cv2.findContours(thresh.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    count = 0
+    for contour in contours:
+        (x, y, w, h) = cv2.boundingRect(contour)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        count += 1
+        # if len(contour) > 3:
+        #     (x, y, w, h) = cv2.boundingRect(contour)
+            # if S - factor < w < S + factor and S - factor < h < S + factor:
+            #     cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            #     count += 1
+            # if (S - factor < w < S + factor and h < S + factor) or (w < S + factor and S - factor < h < S + factor):
+            #     cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            #     count += 1
+
+    print(count)
+    cv2.imwrite("files/practice12_05/contours13.jpg", img)
+    cv2.imwrite("files/practice12_05/thresh.jpg", thresh)
+    cv2.waitKey()
+    cv2.destroyAllWindows()
+
+
+def practice12_05():
+    # Применяя все реализованные методы обработки и анализа изображений, а также любые сторонние методы/библиотеки
+    # помимо реализованных, выделить и автоматически подсчитать на изображении stones.jpg камни заданного размера S
+    # в двух вариантах:
+    # 1. Выделить только те объекты, у которых размер по каждому из направлений равен S.
+    # 2. Выделить камни, у которых размер хотя бы по одному направлению равен S, а в остальных направлениях меньше S.
+    plt.rcParams["axes.grid"] = False
+    # image = read_jpg_grayscale('files/practice12_05/stones.jpg')
+    S = 13
+    factor = 4
+    S = S * factor
+    kernel = np.ones((7, 7), np.uint8)
+    kernel2 = np.ones((3, 3), np.uint8)
+
+    # параметры цветового фильтра
+    hsv_min = np.array((0, 0, 0), np.uint8)
+    hsv_max = np.array((255, 255, 130), np.uint8)
+
+    img = cv2.imread('files/practice12_05/stones.jpg')
+
+    scale_percent = 100 * factor
+
+    width = int(img.shape[1] * scale_percent / 100)
+    height = int(img.shape[0] * scale_percent / 100)
+    dsize = (width, height)
+    img = cv2.resize(img, dsize)
+
+
+    # меняем цветовую модель с BGR на HSV
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    lapImg = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # применяем цветовой фильтр
+    thresh = cv2.inRange(hsv, hsv_min, hsv_max)
+    cv2.imwrite("files/practice12_05/thresh_before.jpg", thresh)
+
+    thresh = cv2.dilate(thresh, kernel)
+    thresh = cv2.erode(thresh, kernel)
+    cv2.imwrite("files/practice12_05/thresh_after.jpg", thresh)
+
+
+    laplacian = cv2.Laplacian(lapImg, cv2.CV_8UC1)
+    cv2.imwrite("files/practice12_05/laplacian.jpg", laplacian)
+    ret, laplacian = cv2.threshold(laplacian, 5, 250, cv2.THRESH_BINARY)
+    cv2.imwrite("files/practice12_05/laplacianTH.jpg", laplacian)
+    laplacian = cv2.dilate(laplacian, kernel2)
+    cv2.imwrite("files/practice12_05/laplacianTH_erode.jpg", laplacian)
+
+
+
+    new_th = laplacian - thresh
+    new_th = cv2.erode(new_th, kernel)
+    new_th = cv2.dilate(new_th, kernel)
+    cv2.imwrite("files/practice12_05/new_th.jpg", new_th)
+
+
+    # ищем контуры и складируем их в переменную contours
+    contours, hierarchy = cv2.findContours(new_th.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    for contour in contours:
+        if len(contour) > 3:
+            (x, y, w, h) = cv2.boundingRect(contour)
+            if S - factor < w < S + factor and S - factor < h < S + factor:
+                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            # if (S - factor <= w <= S + factor and h < S) or (w < S and S - factor <= h <= S + factor):
+            #     cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    cv2.imwrite("files/practice12_05/contours13.jpg", img)
+
+
+def practice12_05_help():
+    def nothing(*arg):
+        pass
+
+    cv2.namedWindow("result")  # создаем главное окно
+    cv2.namedWindow("settings")  # создаем окно настроек
+
+    cap = cv2.VideoCapture(0)
+    # создаем 6 бегунков для настройки начального и конечного цвета фильтра
+    # createTrackbar ('Имя', 'Имя окна', 'начальное значение','максимальное значение','вызов функции при изменение бегунка'
+    cv2.createTrackbar('hue_1', 'settings', 0, 255, nothing)
+    cv2.createTrackbar('satur_1', 'settings', 0, 255, nothing)
+    cv2.createTrackbar('value_1', 'settings', 0, 255, nothing)
+    cv2.createTrackbar('hue_2', 'settings', 255, 255, nothing)
+    cv2.createTrackbar('satur_2', 'settings', 255, 255, nothing)
+    cv2.createTrackbar('value_2', 'settings', 255, 255, nothing)
+
+    img = cv2.imread('files/practice12_05/stones.jpg')
+
+    while True:
+
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # HSV формат изображения
+
+        # считываем значения бегунков
+        h1 = cv2.getTrackbarPos('hue_1', 'settings')
+        s1 = cv2.getTrackbarPos('satur_1', 'settings')
+        v1 = cv2.getTrackbarPos('value_1', 'settings')
+        h2 = cv2.getTrackbarPos('hue_2', 'settings')
+        s2 = cv2.getTrackbarPos('satur_2', 'settings')
+        v2 = cv2.getTrackbarPos('value_2', 'settings')
+
+        # формируем начальный и конечный цвет фильтра
+        h_min = np.array((h1, s1, v1), np.uint8)
+        h_max = np.array((h2, s2, v2), np.uint8)
+
+        # накладываем фильтр на кадр в модели HSV
+        thresh = cv2.inRange(hsv, h_min, h_max)
+
+        cv2.imshow('result', thresh)
+
+        ch = cv2.waitKey(5)
+        if ch == 27:
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+def water():
+    img = cv2.imread('files/practice12_05/stones.jpg')
+    scale_percent = 100 * 2
+    width = int(img.shape[1] * scale_percent / 100)
+    height = int(img.shape[0] * scale_percent / 100)
+    dsize = (width, height)
+    img = cv2.resize(img, dsize)
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    ret, thresh = cv2.threshold(gray, 110, 255, cv2.THRESH_BINARY)
+    cv2.imwrite("files/practice12_05/water/thresh.jpg", thresh)
+
+    # noise removal
+    kernel = np.ones((3, 3), np.uint8)
+    opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
+    # sure background area
+    sure_bg = cv2.dilate(opening, kernel, iterations=3)
+    # Finding sure foreground area
+    dist_transform = cv2.distanceTransform(opening, cv2.DIST_L2, 3)
+    ret, sure_fg = cv2.threshold(dist_transform, 0.1 * dist_transform.max(), 255, 3)
+    # Finding unknown region
+    sure_fg = np.uint8(sure_fg)
+    unknown = cv2.subtract(sure_bg, sure_fg)
+    cv2.imwrite("files/practice12_05/water/opening.jpg", opening)
+    cv2.imwrite("files/practice12_05/water/sure_bg.jpg", sure_bg)
+    cv2.imwrite("files/practice12_05/water/dist_transform.jpg", dist_transform)
+    cv2.imwrite("files/practice12_05/water/sure_fg.jpg", sure_fg)
+    cv2.imwrite("files/practice12_05/water/unknown.jpg", unknown)
+
+
+    # Marker labelling
+    ret, markers = cv2.connectedComponents(sure_fg)
+    # Add one to all labels so that sure background is not 0, but 1
+    markers = markers + 1
+    # Now, mark the region of unknown with zero
+    markers[unknown == 255] = 0
+    cv2.imwrite("files/practice12_05/water/markers.jpg", markers)
+
+
+
+
+    markers = cv2.watershed(img, markers)
+    img[markers == -1] = [255, 0, 0]
+    cv2.imwrite("files/practice12_05/water/markers5.jpg", markers)
+
+    im = cv2.imread("files/practice12_05/water/markers5.jpg", cv2.IMREAD_GRAYSCALE)
+    imC = cv2.applyColorMap(im, cv2.COLORMAP_JET)
+    cv2.imwrite("files/practice12_05/water/imC.jpg", imC)
+
+    # cv2.imwrite("files/practice12_05/water/cm.jpg", cm)
+    pass
+
+
+def water2():
     pass
 
 
@@ -1234,5 +1690,13 @@ if __name__ == "__main__":
     # practice17_03()
     # practice25_03()
     # practice07_04()
-    test124()
+    # practice16_04()
+    # practice21_04()
+    # practice28_04()
+    # practice05_05()
+    # practice12_05_help()
+    practice12_05_old()
+    # practice12_05()
+    # water2()
+    # water()
     pass

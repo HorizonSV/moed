@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 import pandas as pd
 import scipy.integrate as integrate
 import seaborn as sns
+import cv2
 
 
 def linear_trend(x, k=1, b=0):
@@ -43,6 +44,7 @@ def normalize(numbers: np.array, S: int) -> np.array:
     """
     return (((numbers - min(numbers)) / (max(numbers) - min(numbers))) - 0.5) * 2 * S
 
+
 def normalize_v2(numbers, S):
     """
     Функция нормирования
@@ -50,6 +52,7 @@ def normalize_v2(numbers, S):
     norm = []
     min_number = min(numbers)
     max_number = max(numbers)
+    print(min_number, max_number)
     for number in numbers:
         norm.append((((number - min_number) / (max_number - min_number)) - 0.5) * 2 * S)
     return norm
@@ -309,6 +312,27 @@ def hist_v2(image):
     return hist
 
 
+def hist_v2_withSegment(image, segment):
+    S = 256
+    pix = np.array(image)
+    pix2 = np.array(segment)
+
+    print(pix.shape)
+    print(pix2.shape)
+
+    hist = np.zeros(shape=S)
+
+    for i in range(0, pix.shape[0]):
+        for j in range(0, pix.shape[1]):
+            if pix2[i][j] > 0:
+                hist[pix[i][j]] += 1
+
+    for k in range(0, S):
+        hist[k] /= (pix.shape[0] * pix.shape[1])
+
+    return hist
+
+
 def cdf_calc(hist):
     S = 256
     cdf = np.zeros(shape=S)
@@ -451,9 +475,10 @@ def fourie_fast_cs(func):
     Re = []
     Im = []
     C = []
-    Cs = []
+    arr_re = []
+    arr_im = []
     N = len(func)
-    for n in range(round(N/2)):
+    for n in range(round(N)):
         sumRe = 0
         sumIm = 0
         for k in range(N):
@@ -465,8 +490,9 @@ def fourie_fast_cs(func):
         Re.append(re)
         Im.append(im)
         C.append(np.sqrt(pow(re, 2) + pow(im, 2)))  # модуль комлпексного спектра (амплитудный спектр)
-        Cs.append(re + im)  # Спектр Фурье
-    return Cs
+        arr_re.append(re)
+        arr_im.append(im)
+    return C, arr_re, arr_im
 
 
 def del_complex(re1, im1, re2, im2):
@@ -474,6 +500,14 @@ def del_complex(re1, im1, re2, im2):
     im = (im1 * re2 - re1 * im2) / (re2 * re2 + im2 * im2)
     return re, im
 
+
+def del_complex_image(arr_re1, arr_im1, arr_re2, arr_im2):
+    re, im = [], []
+    for re1, im1, re2, im2 in zip(arr_re1, arr_im1, arr_re2, arr_im2):
+        temp_re, temp_im = del_complex(re1, im1, re2, im2)
+        re.append(temp_re)
+        im.append(temp_im)
+    return re, im
 
 def reverse_fourie(Cs):
     """
@@ -579,6 +613,20 @@ def binary_reader(filename):
         data = binary_file.read()
         for i in range(0, len(data), 4):
             pos = struct.unpack('f', data[i:i + 4])
+            figures.append(pos[0])
+        return figures
+
+
+def binary_reader_short(filename):
+    """
+    Функция для чтения файла dat
+    """
+    with open(filename, "rb") as binary_file:
+        figures = []
+
+        data = binary_file.read()
+        for i in range(0, len(data), 2):
+            pos = struct.unpack('h', data[i:i + 2])
             figures.append(pos[0])
         return figures
 
@@ -876,6 +924,7 @@ def pillow_image_grayscale_resize(image, factor, type, mode):
                     r2 = pix[int(col * factor), int((row + 1) * factor)]
                 else:
                     raise ValueError('Wrong mode')
+
                 p = int((r1 + r2) / 2)
                 draw.point((col, row), p)
             if mode == 'increase':
@@ -906,6 +955,19 @@ def pillow_image_grayscale_resize(image, factor, type, mode):
         raise ValueError('Wrong type')
 
     return image_resized
+
+
+def pillow_image_grayscale_cut(image, cut):
+    pix = image.load()  # Выгружаем значения пикселей
+
+    image_cut = Image.new('L', (cut, cut))
+    draw = ImageDraw.Draw(image_cut)  # Создаем инструмент для рисования
+    for col in range(cut):
+        for row in range(cut):
+            p = pix[col, row]
+            draw.point((col, row), p)
+
+    return image_cut
 
 
 def pillow_image_grayscale_negative(image):
@@ -997,12 +1059,39 @@ def diff_by_row_for_trend(image):
     for i in range(300):
         row = []
         for j in range(400 - 1):
-            row.append((image[i, j] + image[i, j + 1]) - image[i, j])
+            temp = (image[i][j] + image[i][j + 1]) - image[i][j]
+            if temp > 255:
+                print(temp)
+            row.append(temp)
         data.append(row)
-    data = np.array(data)
-    data_diff = np.diff(data)
 
-    return data, data_diff
+    return np.diff(data)
+
+
+def diff(image, type, shape):
+    h, w = shape
+    data = []
+
+    if type == 'x':
+        for i in range(h):
+            row = []
+            for j in range(w):
+                row.append(image[i][j])
+            data.append(np.diff(row))
+
+    elif type == 'y':
+        for j in range(w):
+            col = []
+            for i in range(h):
+                col.append(image[i][j])
+            data.append(np.diff(col))
+
+    else:
+        raise ValueError('Wrong type')
+
+    data = np.array(data)
+    print(data.shape)
+    return data
 
 
 def image_conv(data, delta_t, fc1, fc2=0, type='lpf', m=32):
@@ -1011,13 +1100,41 @@ def image_conv(data, delta_t, fc1, fc2=0, type='lpf', m=32):
         if type == 'lpf':
             temp = convolution(data[i], lpf(m, delta_t, fc1))
         elif type == 'hpf':
-            temp = convolution(normalize_v2(data[i], 255), hpf(m, delta_t, fc1))
+            temp = convolution(data[i], hpf(m, delta_t, fc1))
         elif type == 'bsf':
-            temp = convolution(normalize_v2(data[i], 255), bsf(m, delta_t, fc1, fc2))
+            temp = convolution(data[i], bsf(m, delta_t, fc1, fc2))
         else:
             raise ValueError('Wrong type')
 
         data_conv.append(temp[m:400+m])
+
+    return np.array(data_conv)
+
+
+def image_conv_forimage(image, delta_t, fc1, fc2=0, type='lpf', m=32):
+    w, h = image.size[0], image.size[1]
+    pixels = image.load()  # Выгружаем значения пикселей
+    pix = []
+
+    for i in range(h):
+        for j in range(w):
+            pix.append(pixels[j, i])
+
+    pix = np.array(pix).reshape(h, w)
+
+
+    data_conv = []
+    for i in range(h):
+        if type == 'lpf':
+            temp = convolution(pix[i], lpf(m, delta_t, fc1))
+        elif type == 'hpf':
+            temp = convolution(pix[i], hpf(m, delta_t, fc1))
+        elif type == 'bsf':
+            temp = convolution(pix[i], bsf(m, delta_t, fc1, fc2))
+        else:
+            raise ValueError('Wrong type')
+
+        data_conv.append(temp[m:w+m])
 
     return np.array(data_conv)
 
@@ -1108,3 +1225,241 @@ def image_deconv(g, h):
     for i in range(len(g)):
         deconv.append(deconvolution(g[i], h))
     return deconv
+
+
+def thresholding(image, lim):
+    pix = image.load()
+    w, h = image.size[0], image.size[1]
+
+    new_image = []
+    for col in range(w):
+        for row in range(h):
+            if pix[col, row] > lim:
+                new_image.append(255)
+            else:
+                new_image.append(1)
+
+    return new_image
+
+
+def thresholding_noimage(data, lim):
+    data = np.array(data)
+    w, h = data.shape
+
+    new_image = []
+    for col in range(w):
+        for row in range(h):
+            if data[col, row] > lim:
+                new_image.append(255)
+            else:
+                new_image.append(1)
+
+    return new_image
+
+
+def thresholding_noimage_low(data, lim1, lim2=10):
+    data = np.array(data)
+    w, h = data.shape
+    new_data = []
+    for col in range(w):
+        for row in range(h):
+            if lim1 > data[col][row] > lim2:
+                new_data.append(255)
+            else:
+                new_data.append(1)
+
+    return new_data
+
+
+def to_binary(data):
+    data = np.array(data)
+    w, h = data.shape
+    new_data = []
+
+    for col in range(w):
+        for row in range(h):
+            if data[col][row] > 10:
+                new_data.append(255)
+            else:
+                new_data.append(1)
+
+    return new_data
+
+
+def to_negative(data):
+    data = np.array(data)
+    w, h = data.shape
+    new_data = []
+
+    for col in range(w):
+        for row in range(h):
+            if data[col][row] == 255:
+                new_data.append(1)
+            else:
+                new_data.append(255)
+    return new_data
+
+
+def image_deconvolution(matrix_pix, function_core):
+    '''
+    Функция производит деконволюцию изображения по заданному воздействию
+    :param matrix_pix: матрица пикселей изображения
+    :param function_core: заданное воздейтсвие (характер шума, искажения изображения)
+    :return:
+    '''
+    width, height = len(matrix_pix[0]), len(matrix_pix)
+
+    length_core = len(function_core)
+    for i in range(width - length_core):
+        function_core.append(0)
+
+    function_core_spectr, core_re, core_im = fourie_fast_cs(function_core)
+
+    image_spectr = []
+    module = []
+    mass = []
+    i = 0
+
+    for row in range(height):
+        temp, temp5 = fourie_fast(matrix_pix[row])
+        print(len(matrix_pix[row]), width, i)
+        i += 1
+
+        image_spectr.append(temp)
+        # Считаем действительные и мнимые части каждой строки изображения
+        temp5, image_re, image_im = fourie_fast_cs(matrix_pix[row])
+
+        # Комплексное деление строчки изображения и ядра функции
+        re, im = del_complex_image(image_re, image_im, core_re, core_im)
+
+        # Вычисление модуля отношения комплексных величин
+        module_temp = []
+        for col in range(width):
+            module_temp.append(re[col] + im[col])
+
+        module.append(module_temp)
+        # Обратное преобразование фурье
+        mass.append(reverse_fourie(module[row]))
+
+    return mass
+
+
+
+
+
+def optimal_image_deconvolution(matrix_pix, function_core, k):
+    '''
+    Функция производит деконволюцию изображения по заданному воздействию
+    :param matrix_pix: матрица пикселей изображения
+    :param function_core: заданное воздейтсвие (характер шума, искажения изображения)
+    :return:
+    '''
+    width, height = len(matrix_pix[0]), len(matrix_pix)  # Ширина и высота изображения
+
+    length_core = len(function_core)
+    for i in range(width - length_core):
+        function_core.append(0)
+
+    function_core_spectr, re_h, im_h = fourie_fast_cs(function_core)
+
+    image_spectr = []
+    module = []
+    mass = []
+    step = 0
+
+    for row in range(height):
+        temp, temp5 = fourie_fast(matrix_pix[row])
+        print(len(matrix_pix[row]), width, step)
+        step += 1
+
+        image_spectr.append(temp)
+        temp5, re_g, im_g = fourie_fast_cs(matrix_pix[row])
+
+        ratio_re, ratio_im = [], []
+        for i in range(width):
+            corr_factor = (re_h[i] ** 2 + im_h[i] ** 2) + k
+
+            ratio_re.append((re_h[i] * re_g[i] + im_h[i] * im_g[i]) / corr_factor)
+            ratio_im.append((re_h[i] * im_g[i] - im_h[i] * re_g[i]) / corr_factor)
+
+        module_temp = []
+        for col in range(width):
+            module_temp.append(ratio_re[col] + ratio_im[col])
+
+        module.append(module_temp)
+        mass.append(reverse_fourie(module[row]))
+
+    return mass
+
+
+def gradient_pribl(x, y, mask_x, mask_y):
+    z9 = mask_x[2][2]
+    z5 = mask_x[1][1]
+    z8 = mask_y[1][2]
+    z6 = mask_y[2][1]
+
+    x, y = np.array(x), np.array(y)
+    w, h = x.shape[1], y.shape[0]
+    data = []
+
+    for row in range(h-1):
+        for col in range(w-1):
+            gx = ((x[row + 1][col + 1] * z9) - (x[row][col] * z5))
+            gy = ((y[row][col + 1] * z8) - (y[row + 1][col] * z6))
+            data.append(abs(gx) + abs(gy))
+
+    return data
+
+
+def laplasian(image, x, y):
+    c = 1
+    x, y = np.array(x), np.array(y)
+    w, h = x.shape[1], y.shape[0]
+    data = []
+
+    print(h-1, w-1)
+
+    for row in range(h-1):
+        for col in range(w-1):
+            delta_x = 2 * x[row][col] - (x[row + 1][col] + x[row - 1][col])
+            delta_y = 2 * x[row][col] - (x[row][col + 1] + x[row][col - 1])
+            delta_f = delta_x + delta_y
+            data.append(image[row][col] + c * delta_f)
+
+    return data
+
+
+def morph_transform(image, shape, mask, type):
+    w, h = 300, 200
+    print(h)
+    data = []
+
+    if type == 'erosia':
+        for row in range(100, h):
+            for col in range(100, w):
+                if (image[row - 1][col - 1] == 1 and image[row - 1][col] == 1 and image[row - 1][col + 1] == 1
+                        and image[row][col - 1] == 1 and image[row][col] == 1 and image[row][col + 1] == 1
+                        and image[row + 1][col - 1] == 1 and image[row + 1][col] == 1 and image[row + 1][col + 1] == 1):
+                    data.append(1)
+                else:
+                    data.append(0)
+        return data
+
+    elif type == 'dilatation':
+        return data
+
+    else:
+        raise ValueError('Wrong type')
+
+
+def dilationErosion_forSegment(image, kern):
+    img = cv2.imread(image, 0)
+    kernel = np.ones((kern, kern), np.uint8)
+    (thresh, THimg) = cv2.threshold(img, 15, 250, cv2.THRESH_BINARY)
+
+    imgDilation = cv2.dilate(THimg, kernel, iterations=1)
+    imgZamk = cv2.erode(imgDilation, kernel, iterations=1)
+
+    cv2.imwrite("files/practice05_05/image_imgZamk.jpg", imgZamk)
+
+    return imgZamk
